@@ -1,0 +1,6 @@
+{
+  "name": "Solidity Lending Protocol Simulator",
+  "description": "Interactive smart contract playground simulating a simplified Compound/Aave protocol with collateral, borrow, interest rate curves, and liquidations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
