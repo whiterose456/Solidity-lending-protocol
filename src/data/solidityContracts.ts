@@ -401,5 +401,187 @@ contract PriceOracle is Ownable {
     }
 }
 `
+  },
+  {
+    name: "IPriceOracle.sol",
+    filename: "IPriceOracle.sol",
+    description: "Interface for price oracle implementations providing asset price feeds to the lending pool.",
+    code: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title IPriceOracle
+ * @notice Interface for price oracle contracts that provide asset pricing.
+ */
+interface IPriceOracle {
+    /**
+     * @notice Get the current price of the asset
+     * @return The price with 6 decimal places (USDC scale)
+     */
+    function getAssetPrice() external view returns (uint256);
+    
+    /**
+     * @notice Update the asset price (typically restricted to owner)
+     * @param _price The new price with 6 decimal places
+     */
+    function setAssetPrice(uint256 _price) external;
+}
+`
+  },
+  {
+    name: "IInterestRateModel.sol",
+    filename: "IInterestRateModel.sol",
+    description: "Interface for interest rate model contracts that calculate dynamic borrow and supply rates.",
+    code: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title IInterestRateModel
+ * @notice Interface for interest rate model contracts used by lending protocols.
+ */
+interface IInterestRateModel {
+    /**
+     * @notice Calculate the current borrow rate
+     * @param cash Amount of cash available in the pool
+     * @param borrows Total amount borrowed
+     * @param reserves Total amount in reserves
+     * @return The borrow rate per year (scaled to 1e18)
+     */
+    function getBorrowRate(
+        uint256 cash,
+        uint256 borrows,
+        uint256 reserves
+    ) external view returns (uint256);
+    
+    /**
+     * @notice Calculate the supply rate for suppliers
+     * @param cash Amount of cash available in the pool
+     * @param borrows Total amount borrowed
+     * @param reserves Total amount in reserves
+     * @param reserveFactorBps Reserve factor in basis points
+     * @return The supply rate per year (scaled to 1e18)
+     */
+    function getSupplyRate(
+        uint256 cash,
+        uint256 borrows,
+        uint256 reserves,
+        uint256 reserveFactorBps
+    ) external view returns (uint256);
+    
+    /**
+     * @notice Get the current utilization rate
+     * @param cash Amount of cash available
+     * @param borrows Total amount borrowed
+     * @param reserves Total amount in reserves
+     * @return The utilization rate (scaled to 1e18)
+     */
+    function getUtilizationRate(
+        uint256 cash,
+        uint256 borrows,
+        uint256 reserves
+    ) external pure returns (uint256);
+}
+`
+  },
+  {
+    name: "MockUSDC.sol",
+    filename: "MockUSDC.sol",
+    description: "Mock ERC20 stablecoin token for testing the lending protocol in simulation environments.",
+    code: `// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+/**
+ * @title MockUSDC
+ * @notice Simple ERC20 mock token for USDC used in testing lending protocol
+ */
+contract MockUSDC {
+    string public name = "Mock USD Coin";
+    string public symbol = "USDC";
+    uint8 public decimals = 6;
+    uint256 public totalSupply = 1000000000 * 10 ** 6; // 1 billion USDC
+
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+
+    constructor() {
+        balanceOf[msg.sender] = totalSupply;
+    }
+
+    /**
+     * @notice Transfer tokens from caller to recipient
+     */
+    function transfer(address to, uint256 amount) external returns (bool) {
+        require(to != address(0), "Invalid recipient");
+        require(balanceOf[msg.sender] >= amount, "Insufficient balance");
+        
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        
+        emit Transfer(msg.sender, to, amount);
+        return true;
+    }
+
+    /**
+     * @notice Approve spender to transfer tokens on behalf of caller
+     */
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        emit Approval(msg.sender, spender, amount);
+        return true;
+    }
+
+    /**
+     * @notice Transfer tokens from one address to another (with approval)
+     */
+    function transferFrom(
+        address from,
+        address to,
+        uint256 amount
+    ) external returns (bool) {
+        require(to != address(0), "Invalid recipient");
+        require(balanceOf[from] >= amount, "Insufficient balance");
+        require(allowance[from][msg.sender] >= amount, "Insufficient allowance");
+
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        allowance[from][msg.sender] -= amount;
+
+        emit Transfer(from, to, amount);
+        return true;
+    }
+
+    /**
+     * @notice Increase allowance for spender
+     */
+    function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
+        allowance[msg.sender][spender] += addedValue;
+        emit Approval(msg.sender, spender, allowance[msg.sender][spender]);
+        return true;
+    }
+
+    /**
+     * @notice Decrease allowance for spender
+     */
+    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
+        require(allowance[msg.sender][spender] >= subtractedValue, "Allowance too low");
+        allowance[msg.sender][spender] -= subtractedValue;
+        emit Approval(msg.sender, spender, allowance[msg.sender][spender]);
+        return true;
+    }
+
+    /**
+     * @notice Mint new tokens (for testing purposes)
+     */
+    function mint(address to, uint256 amount) external {
+        require(to != address(0), "Invalid recipient");
+        balanceOf[to] += amount;
+        totalSupply += amount;
+        emit Transfer(address(0), to, amount);
+    }
+}
+`
   }
 ];
