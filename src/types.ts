@@ -9,7 +9,7 @@ export interface UserState {
 }
 
 export interface ProtocolParameters {
-  collateralFactorHex: number; // e.g. 0.75 (75%)
+  collateralFactor: number; // e.g. 0.75 (75%)
   liquidationThreshold: number; // e.g. 0.80 (80%)
   liquidationPenalty: number;   // e.g. 0.08 (8%) bonus to liquidator
   baseRate: number;            // e.g. 0.02 (2% base borrow rate)
@@ -20,8 +20,6 @@ export interface ProtocolParameters {
 }
 
 export interface ProtocolState {
-  totalCollateralEth: number;
-  totalBorrowedUsdc: number;
   totalReservesUsdc: number;
   ethPriceUsdc: number; // Oracle price of ETH in USDC
   blockNumber: number;

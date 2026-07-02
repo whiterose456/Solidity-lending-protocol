@@ -34,7 +34,7 @@ import { TransactionLedger } from './components/TransactionLedger';
 export default function App() {
   // Protocol Parameters State
   const [params, setParams] = useState<ProtocolParameters>({
-    collateralFactorHex: 0.75, // 75% max LTV
+    collateralFactor: 0.75, // 75% max LTV
     liquidationThreshold: 0.80, // 80% liquidation trigger floor
     liquidationPenalty: 0.08,  // 8% liquidation bonus
     baseRate: 0.02,           // 2% base interest
@@ -49,8 +49,6 @@ export default function App() {
 
   // Protocol Global State
   const [protocol, setProtocol] = useState<ProtocolState>({
-    totalCollateralEth: 3.7, // sum of users' deposits
-    totalBorrowedUsdc: 4200, // Alice (1500) + Bob (2700)
     totalReservesUsdc: 0,
     ethPriceUsdc: 3000,
     blockNumber: 19829281,
@@ -198,7 +196,6 @@ export default function App() {
     setProtocol(prev => ({
       ...prev,
       ethPriceUsdc: newPrice,
-      blockNumber: prev.blockNumber + 1
     }));
     
     // Add transaction log
@@ -402,7 +399,7 @@ export default function App() {
     accrueInterestInternal(0);
 
     // Calculate Max Borrow based on Collateral Factor (75%)
-    const maxLtvValueUsdc = activeUser.collateralBalance * ethPrice * params.collateralFactorHex;
+    const maxLtvValueUsdc = activeUser.collateralBalance * ethPrice * params.collateralFactor;
     const currentBorrow = activeUser.borrowedBalance;
     const remainingBorrowCapacity = maxLtvValueUsdc - currentBorrow;
 
@@ -872,15 +869,15 @@ export default function App() {
                 <div className="flex flex-col gap-1.5">
                   <div className="flex items-center justify-between text-xs text-zinc-400">
                     <span className="font-mono">Collateral Factor (Max LTV)</span>
-                    <span className="font-bold font-mono text-indigo-450">{Math.round(params.collateralFactorHex * 100)}%</span>
+                    <span className="font-bold font-mono text-indigo-450">{Math.round(params.collateralFactor * 100)}%</span>
                   </div>
                   <input
                     type="range"
                     min="0.50"
                     max="0.85"
                     step="0.05"
-                    value={params.collateralFactorHex}
-                    onChange={(e) => setParams(prev => ({ ...prev, collateralFactorHex: Number(e.target.value) }))}
+                    value={params.collateralFactor}
+                    onChange={(e) => setParams(prev => ({ ...prev, collateralFactor: Number(e.target.value) }))}
                     className="w-full accent-indigo-500 bg-zinc-800 rounded-lg outline-none cursor-pointer h-1.5"
                   />
                   <span className="text-[9px] text-zinc-500 italic">Limit debt borrowers can build per ETH stake</span>
@@ -939,7 +936,7 @@ export default function App() {
                   const hf = calculateHealthFactor(user.collateralBalance, user.borrowedBalance, ethPrice, params.liquidationThreshold);
                   const isUnhealthy = hf < 1.0 && user.borrowedBalance > 0;
                   const isWarning = hf >= 1.0 && hf < 1.3 && user.borrowedBalance > 0;
-                  const maxBorrow = user.collateralBalance * ethPrice * params.collateralFactorHex;
+                  const maxBorrow = user.collateralBalance * ethPrice * params.collateralFactor;
                   const ltvPercent = maxBorrow > 0 ? (user.borrowedBalance / (user.collateralBalance * ethPrice)) * 100 : 0;
 
                   return (
