@@ -66,6 +66,40 @@ describe("LendingPool Integration Tests", function () {
     expect(userCollateral).to.equal(depositAmount);
   });
 
+  it("Should credit direct ETH transfers to the actual sender", async function () {
+    const amount = ethers.parseEther("2");
+
+    await user1.sendTransaction({
+      to: await lendingPool.getAddress(),
+      value: amount,
+    });
+
+    expect(await lendingPool.userCollateral(user1.address)).to.equal(amount);
+    expect(await lendingPool.userCollateral(await lendingPool.getAddress())).to.equal(0);
+    expect(await lendingPool.totalCollateralETH()).to.equal(amount);
+  });
+
+  it("Should allow users to deposit through the explicit function", async function () {
+    const amount = ethers.parseEther("1");
+
+    await lendingPool.connect(user1).depositCollateral({ value: amount });
+
+    expect(await lendingPool.userCollateral(user1.address)).to.equal(amount);
+    expect(await lendingPool.totalCollateralETH()).to.equal(amount);
+  });
+
+  it("Should allow safe collateral withdrawals", async function () {
+    const amount = ethers.parseEther("2");
+    await lendingPool.connect(user1).depositCollateral({ value: amount });
+
+    await expect(lendingPool.connect(user1).withdrawCollateral(amount))
+      .to.emit(lendingPool, "Withdrawn")
+      .withArgs(user1.address, amount);
+
+    expect(await lendingPool.userCollateral(user1.address)).to.equal(0);
+    expect(await lendingPool.totalCollateralETH()).to.equal(0);
+  });
+
   it("Should calculate health factor correctly", async function () {
     // User deposits 10 ETH
     await user1.sendTransaction({
