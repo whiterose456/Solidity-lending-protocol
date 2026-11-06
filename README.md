@@ -1,156 +1,177 @@
 # Solidity Lending Protocol Simulator
 
-A complete local simulator for an ETH-collateralized lending protocol built with Hardhat, Solidity, and a React/Vite frontend.
+An educational, locally runnable DeFi lending protocol built with **Solidity, Hardhat, TypeScript, React, and Vite**. Users deposit ETH as collateral, borrow mock USDC, accrue variable interest, repay debt, and liquidate undercollateralized positions.
 
-## Project Overview
+> **Status:** Educational simulator — not audited and not suitable for real funds or production deployment.
 
-This repository contains:
-- A Solidity lending protocol that supports ETH collateral deposits, USDC borrowing, repayment, and liquidations.
-- A dynamic interest rate model with utilization-based borrow and supply rates.
-- A simple price oracle for ETH/USDC pricing used to calculate borrowing power and liquidation thresholds.
-- A React/Vite UI for reviewing protocol state, transaction logs, and smart contract source code.
-- Hardhat scripts and tests for deployment and integration validation.
+## Protocol at a glance
 
-## Key Features
+- **Collateral asset:** ETH (native currency)
+- **Debt asset:** Mock USDC (6 decimals)
+- **Collateral factor (LTV):** 75%
+- **Liquidation threshold:** 80%
+- **Liquidation bonus:** 8%
+- **Reserve factor:** 10%
+- **Interest model:** Utilization-based kinked rate model
 
-- ETH collateral deposits
-- USDC stablecoin borrowing with collateral factor enforcement
-- Debt repayment and health factor checks
-- Liquidation of undercollateralized positions
-- Dynamic interest rates using a kinked slope model
-- Mock USDC for local testing
-- Frontend simulator with contract code viewer
+The simulator separates the lending pool, price oracle, and interest-rate model so each part can be inspected and tested independently.
 
-## Repository Structure
+## Architecture
 
-- `contracts/` - Solidity smart contracts and contract-specific documentation
-- `scripts/` - Deployment scripts for local Hardhat networks
-- `src/` - React application UI source code
-- `test/` - Hardhat tests for the lending pool workflow
-- `hardhat.config.ts` - Hardhat compiler and network configuration
-- `package.json` - Project dependencies and npm scripts
+```text
+                 ┌──────────────────────┐
+                 │      React UI        │
+                 │ protocol dashboard   │
+                 └──────────┬───────────┘
+                            │
+                 ┌──────────▼───────────┐
+                 │     LendingPool      │
+                 │ deposits / borrowing │
+                 │ repayment/liquidation│
+                 └──────┬────────┬─────┘
+                        │        │
+             ┌──────────▼──┐  ┌──▼────────────────┐
+             │ PriceOracle │  │ InterestRateModel │
+             │ ETH / USDC  │  │ utilization → rate│
+             └─────────────┘  └───────────────────┘
+                        │
+                 ┌──────▼──────┐
+                 │   MockUSDC  │
+                 │  ERC-20     │
+                 └─────────────┘
+```
 
-## Setup
+### Contract responsibilities
 
-### Prerequisites
+| Contract | Responsibility |
+|---|---|
+| `LendingPool.sol` | Collateral accounting, borrowing, repayment, interest accrual, health factors, and liquidation |
+| `InterestRateModel.sol` | Calculates utilization and variable borrow/supply rates |
+| `PriceOracle.sol` | Supplies the simulated ETH/USDC price |
+| `MockUSDC.sol` | ERC-20 debt token for local development |
+| `IPriceOracle.sol`, `IInterestRateModel.sol` | Interfaces used by the pool |
 
-- Node.js 18+ recommended
+## How the protocol works
+
+1. **Deposit:** A user deposits ETH. The pool records the user's collateral balance.
+2. **Borrow:** The pool values the collateral using the oracle and checks the collateral factor before transferring USDC.
+3. **Accrue interest:** The pool updates the global borrow index according to the utilization-based annual rate and elapsed blocks.
+4. **Repay:** The borrower approves the pool to transfer USDC, then repays some or all outstanding debt.
+5. **Withdraw:** Collateral can be withdrawn only if the account remains above the minimum health factor.
+6. **Liquidate:** When health factor falls below 1, a liquidator repays eligible debt and receives collateral plus the configured bonus.
+
+## Core formulas
+
+All percentage parameters use basis points (10,000 = 100%). The oracle returns ETH price in USDC with 6 decimals; ETH collateral is denominated in wei.
+
+### Maximum borrowing power
+
+```text
+collateralValue = collateralETH(wei) × ethPrice(USDC, 6 decimals) / 1e18
+maxBorrow       = collateralValue × collateralFactor / 10,000
+```
+
+With ETH at $3,000 and a 75% collateral factor, 1 ETH supports up to 2,250 USDC of debt (before accounting for any existing debt).
+
+### Health factor
+
+```text
+healthFactor = collateralValue × liquidationThreshold
+               / (10,000 × outstandingDebt)
+```
+
+The contract returns this ratio scaled by 1e18. A value at or above 1e18 is healthy; below 1e18 is eligible for liquidation.
+
+### Utilization
+
+```text
+utilization = borrows / (cash + borrows - reserves)
+```
+
+The kinked interest model increases rates more aggressively after utilization crosses its configured kink. This is intended to discourage borrowing when pool liquidity is scarce.
+
+## Repository structure
+
+```text
+contracts/       Solidity contracts and interfaces
+scripts/         Local deployment and setup scripts
+test/            Hardhat integration tests
+src/             React + Vite simulator
+hardhat.config.ts Hardhat compiler and network configuration
+```
+
+## Run locally
+
+### Requirements
+
+- Node.js 18+
 - npm
 
-### Install dependencies
+### Install and start the frontend
 
 ```bash
 npm install
-```
-
-## Local Development
-
-### Run the React app
-
-```bash
 npm run dev
 ```
 
-Then open the local Vite address shown in the terminal (usually `http://localhost:5173`).
-
-### Compile contracts
+### Compile and test contracts
 
 ```bash
 npm run hardhat:compile
-```
-
-### Run tests
-
-```bash
 npm run hardhat:test
 ```
 
-### Start a local Hardhat node
+### Deploy to a local Hardhat node
+
+Terminal 1:
 
 ```bash
 npm run hardhat:node
 ```
 
-### Deploy contracts locally
-
-Open a second terminal and run:
+Terminal 2:
 
 ```bash
 npm run hardhat:deploy
 ```
 
-This deploys the following contracts to the local Hardhat network:
-- `MockUSDC`
-- `InterestRateModel`
-- `PriceOracle`
-- `LendingPool`
-
-The deployment script also seeds the lending pool with USDC for local simulation.
-
-## Smart Contract Overview
-
-### `contracts/LendingPool.sol`
-
-The main protocol contract that:
-- accepts ETH deposits as collateral
-- allows users to borrow USDC against collateral
-- supports debt repayment and withdrawal of collateral
-- enforces health factor checks and liquidation rules
-
-### `contracts/InterestRateModel.sol`
-
-Implements a utilization-based interest model with:
-- base borrow rate
-- slope multiplier below a utilization kink
-- jump multiplier above the kink
-- reserve factor support
-
-### `contracts/PriceOracle.sol`
-
-A test oracle for ETH price data used to value collateral and calculate maximum borrow limits.
-
-### `contracts/MockUSDC.sol`
-
-A local ERC20 mock token that simulates USDC and supports minting for tests.
-
-## Frontend Notes
-
-The React app visualizes the protocol state and includes:
-- protocol parameter cards
-- utilization and APY calculations
-- transaction log history
-- smart contract code viewer
-
-The frontend source is in `src/`, with UI components stored under `src/components/`.
+The deployment script deploys MockUSDC, InterestRateModel, PriceOracle, and LendingPool, then seeds the pool with mock liquidity.
 
 ## Testing
 
-The test suite in `test/LendingPool.test.ts` covers:
-- ETH collateral deposits
-- borrow limits and health factor checks
-- repayment workflows
-- price oracle updates
-- rejection of unsafe borrow amounts
+The integration suite exercises the core lending lifecycle, including:
 
-Run all tests with:
+- ETH collateral deposits through the receive function and explicit deposit function
+- Correct collateral accounting
+- Health factor for accounts without debt
+- Borrow limits and rejection of excessive borrowing
+- Debt repayment
+- Safe collateral withdrawal
+- Oracle price updates
 
-```bash
-npm run hardhat:test
-```
+Run the suite with `npm run hardhat:test`.
 
-## Notes
+## Security model and known limitations
 
-- This project is intended as a simulator and educational example rather than a production-ready lending protocol.
-- The oracle is owner-controlled and meant for local testing only.
-- Review `contracts/README.md` for contract-level documentation.
+This repository is a learning simulator. It intentionally does not claim production-grade security.
 
-## Useful Commands
+- The price oracle is owner-controlled; it is not a decentralized or manipulation-resistant oracle.
+- The pool uses a simplified global interest index and block-based linear accrual model.
+- There is no full supplier-share accounting or depositor withdrawal queue.
+- Liquidation and liquidity management are simplified compared with production lending markets.
+- The contracts have not undergone an independent security audit.
+- Do not deploy with real assets or private keys holding funds.
 
-```bash
-npm install
-npm run dev
-npm run hardhat:compile
-npm run hardhat:test
-npm run hardhat:node
-npm run hardhat:deploy
-```
+Before any production-oriented evolution, prioritize audited oracle integrations, robust interest accounting, access-control review, invariant/fuzz testing, liquidation edge cases, and an independent audit.
+
+## Further reading
+
+- [Solidity documentation](https://docs.soliditylang.org/)
+- [Hardhat documentation](https://hardhat.org/docs)
+- [OpenZeppelin Contracts](https://docs.openzeppelin.com/contracts/)
+- [Aave developer documentation](https://docs.aave.com/)
+- [Compound documentation](https://docs.compound.finance/)
+
+## License
+
+See the repository license file.
