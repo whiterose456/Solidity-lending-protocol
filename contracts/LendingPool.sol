@@ -76,13 +76,18 @@ contract LendingPool is ReentrancyGuard {
      * @notice Deposit ETH as collateral to allow borrowing against it.
      */
     function depositCollateral() external payable nonReentrant {
-        require(msg.value > 0, "Amount must exceed 0");
+        _depositCollateral(msg.sender, msg.value);
+    }
+
+    /// @dev Shared deposit accounting used by both the explicit function and receive().
+    function _depositCollateral(address account, uint256 amount) internal {
+        require(amount > 0, "Amount must exceed 0");
         accrueInterest();
 
-        userCollateral[msg.sender] += msg.value;
-        totalCollateralETH += msg.value;
+        userCollateral[account] += amount;
+        totalCollateralETH += amount;
 
-        emit Deposited(msg.sender, msg.value);
+        emit Deposited(account, amount);
     }
 
     /**
@@ -99,7 +104,8 @@ contract LendingPool is ReentrancyGuard {
         // Verify safety of remaining collateral
         require(getHealthFactor(msg.sender) >= 1e18, "Unhealthy post-withdrawal ratio");
 
-        payable(msg.sender).transfer(amount);
+        (bool success, ) = payable(msg.sender).call{value: amount}("");
+        require(success, "ETH transfer failed");
         emit Withdrawn(msg.sender, amount);
     }
 
@@ -183,7 +189,8 @@ contract LendingPool is ReentrancyGuard {
 
         // Liquidator transfers debt token to pool, gets ETH collateral in exchange
         require(debtToken.transferFrom(msg.sender, address(this), finalRepay), "Token transfer failed");
-        payable(msg.sender).transfer(totalCollateralToSeize);
+        (bool success, ) = payable(msg.sender).call{value: totalCollateralToSeize}("");
+        require(success, "ETH transfer failed");
 
         emit Liquidated(borrower, msg.sender, finalRepay, totalCollateralToSeize);
     }
@@ -251,7 +258,7 @@ contract LendingPool is ReentrancyGuard {
     }
 
     // Allow ETH deposits directly
-    receive() external payable {
-        this.depositCollateral();
+    receive() external payable nonReentrant {
+        _depositCollateral(msg.sender, msg.value);
     }
 }
