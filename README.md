@@ -2,7 +2,7 @@
 
 An educational, locally runnable DeFi lending protocol built with **Solidity, Hardhat, TypeScript, React, and Vite**. Users deposit ETH as collateral, borrow mock USDC, accrue variable interest, repay debt, and liquidate undercollateralized positions.
 
-> **Status:** Educational simulator — not audited and not suitable for real funds or production deployment.
+> *anot audited and not suitable for real funds or production deployment.
 
 ## Protocol at a glance
 
