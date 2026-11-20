@@ -100,7 +100,7 @@ src/             React + Vite simulator
 hardhat.config.ts Hardhat compiler and network configuration
 ```
 
-## Run locally
+## Run locally dependencies
 
 ### Requirements
 
